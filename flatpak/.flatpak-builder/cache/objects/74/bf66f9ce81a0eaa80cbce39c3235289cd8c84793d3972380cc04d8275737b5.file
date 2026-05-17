@@ -1,0 +1,25 @@
+[Application]
+name=com.seyfullahozdaglar.EyeGuard
+runtime=org.kde.Platform/x86_64/6.8
+sdk=org.kde.Sdk/x86_64/6.8
+command=eyeguard
+
+[Context]
+shared=ipc;
+sockets=x11;wayland;
+devices=dri;
+filesystems=home;xdg-config/kdeglobals:ro;
+
+[Session Bus Policy]
+com.canonical.AppMenu.Registrar=talk
+org.kde.kconfig.notify=talk
+org.kde.KGlobalSettings=talk
+org.kde.kdeconnect=talk
+
+[Extension com.seyfullahozdaglar.EyeGuard.Debug]
+directory=lib/debug
+autodelete=true
+no-autodownload=true
+
+[Build]
+built-extensions=com.seyfullahozdaglar.EyeGuard.Debug;

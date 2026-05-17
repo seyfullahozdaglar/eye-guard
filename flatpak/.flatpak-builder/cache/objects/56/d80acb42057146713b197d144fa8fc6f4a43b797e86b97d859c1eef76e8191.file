@@ -1,0 +1,5 @@
+[Runtime]
+name=com.seyfullahozdaglar.EyeGuard.Debug
+
+[ExtensionOf]
+ref=app/com.seyfullahozdaglar.EyeGuard/x86_64/master

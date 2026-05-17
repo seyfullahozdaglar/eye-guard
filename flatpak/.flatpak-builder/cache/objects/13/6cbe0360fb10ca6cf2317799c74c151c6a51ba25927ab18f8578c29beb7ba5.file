@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Eye Guard
+Comment=Minimal eye break reminder
+Exec=eyeguard
+Icon=com.seyfullahozdaglar.EyeGuard
+Terminal=false
+Type=Application
+Categories=Utility;

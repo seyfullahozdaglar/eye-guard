@@ -1,0 +1,46 @@
+{
+  "id" : "com.seyfullahozdaglar.EyeGuard",
+  "runtime" : "org.kde.Platform",
+  "runtime-version" : "6.8",
+  "runtime-commit" : "d101b2f79d972e83b6e438af2e4abe90e3a01387a6db6db2667d4ba1835afbc8",
+  "sdk" : "org.kde.Sdk",
+  "sdk-commit" : "a62790750ef9c82730075a66dec280f6a03be14a148f8e4eb4b5f07fa8499ba2",
+  "command" : "eyeguard",
+  "modules" : [
+    {
+      "name" : "python-dependencies",
+      "buildsystem" : "simple",
+      "build-options" : {
+        "build-args" : [
+          "--share=network"
+        ]
+      },
+      "build-commands" : [
+        "pip3 install --prefix=/app PyQt6"
+      ]
+    },
+    {
+      "name" : "eyeguard",
+      "buildsystem" : "simple",
+      "sources" : [
+        {
+          "path" : "..",
+          "type" : "dir"
+        }
+      ],
+      "build-commands" : [
+        "install -Dm755 eyeguard.py /app/bin/eyeguard",
+        "install -Dm644 icon.png /app/share/icons/hicolor/512x512/apps/com.seyfullahozdaglar.EyeGuard.png",
+        "install -Dm644 com.seyfullahozdaglar.EyeGuard.desktop /app/share/applications/com.seyfullahozdaglar.EyeGuard.desktop"
+      ]
+    }
+  ],
+  "finish-args" : [
+    "--share=ipc",
+    "--socket=x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--filesystem=home"
+  ],
+  "source-date-epoch" : 1779023675
+}
