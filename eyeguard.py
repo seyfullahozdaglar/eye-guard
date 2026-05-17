@@ -1,6 +1,8 @@
 # eyeguard.py
 
 import sys
+import os
+
 from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
@@ -18,6 +20,18 @@ from PyQt6.QtWidgets import (
 )
 
 
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath("")
+
+    return os.path.join(base_path, relative_path)
+
+
+ICON_PATH = resource_path("icon.png")
+
+
 class BreakOverlay(QWidget):
     def __init__(self, on_back_clicked):
         super().__init__()
@@ -28,7 +42,7 @@ class BreakOverlay(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Eye Guard Break")
-        self.setWindowIcon(QIcon("icon.png"))
+        self.setWindowIcon(QIcon(ICON_PATH))
 
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
@@ -160,7 +174,7 @@ class EyeGuard(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Eye Guard")
-        self.setWindowIcon(QIcon("icon.png"))
+        self.setWindowIcon(QIcon(ICON_PATH))
 
         self.setMinimumSize(560, 360)
         self.resize(640, 420)
@@ -326,7 +340,7 @@ class EyeGuard(QWidget):
 
     def setup_tray(self):
         self.tray = QSystemTrayIcon(
-            QIcon("icon.png"),
+            QIcon(ICON_PATH),
             self
         )
 
@@ -436,7 +450,7 @@ def main():
 
     app.setQuitOnLastWindowClosed(False)
 
-    app.setWindowIcon(QIcon("icon.png"))
+    app.setWindowIcon(QIcon(ICON_PATH))
 
     window = EyeGuard()
     window.show()

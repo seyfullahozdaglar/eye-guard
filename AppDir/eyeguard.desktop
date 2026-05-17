@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Eye Guard
+Exec=eyeguard
+Icon=eyeguard
+Categories=Utility;
+Terminal=false
