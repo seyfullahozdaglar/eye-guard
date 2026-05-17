@@ -26,3 +26,9 @@ python3 eyeguard.py
 ```bash
 pyinstaller --onefile --windowed eyeguard.py
 ```
+
+## Screenshots
+
+![Screenshot 1](YOUR_SCREENSHOT_FILENAME.png)
+
+![Screenshot 2](YOUR_SCREENSHOT_FILENAME2.png)
