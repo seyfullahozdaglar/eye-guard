@@ -1,10 +1,17 @@
 # eyeguard.py
 
-import sys
 import os
+import sys
 
-from PyQt6.QtCore import Qt, QTimer, QSettings
-from PyQt6.QtGui import QAction, QIcon
+from PyQt6.QtCore import (
+    Qt,
+    QTimer,
+    QSettings,
+    QPropertyAnimation,
+    QEasingCurve,
+    pyqtProperty,
+)
+from PyQt6.QtGui import QAction, QIcon, QPainter, QColor
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
@@ -20,12 +27,11 @@ from PyQt6.QtWidgets import (
 )
 
 
-def resource_path(relative_path):
+def resource_path(relative_path: str) -> str:
     try:
-        base_path = sys._MEIPASS
+        base_path = sys._MEIPASS  # type: ignore[attr-defined]
     except Exception:
         base_path = os.path.abspath("")
-
     return os.path.join(base_path, relative_path)
 
 
@@ -35,36 +41,41 @@ ICON_PATH = resource_path("icon.png")
 class BreakOverlay(QWidget):
     def __init__(self, on_back_clicked):
         super().__init__()
-
         self.on_back_clicked = on_back_clicked
+
+        self._overlay_alpha = 0.0
+        self._close_after_fade = False
+        self.break_duration = 20
+        self.remaining_seconds = 20
+
+        self.fade_animation = QPropertyAnimation(self, b"overlayAlpha")
+        self.fade_animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.fade_animation.finished.connect(self._on_fade_finished)
+
+        self.break_timer = QTimer(self)
+        self.break_timer.timeout.connect(self._tick_break)
 
         self.setup_ui()
 
     def setup_ui(self):
         self.setWindowTitle("Eye Guard Break")
         self.setWindowIcon(QIcon(ICON_PATH))
-
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
-
-        self.setAttribute(
-            Qt.WidgetAttribute.WA_TranslucentBackground,
-            True
-        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
 
-        overlay = QFrame()
-        overlay.setObjectName("overlay")
+        self.center_wrap = QFrame()
+        self.center_wrap.setObjectName("center_wrap")
 
-        overlay_layout = QVBoxLayout(overlay)
-        overlay_layout.setContentsMargins(40, 40, 40, 40)
-        overlay_layout.setSpacing(20)
-        overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        wrap_layout = QVBoxLayout(self.center_wrap)
+        wrap_layout.setContentsMargins(40, 40, 40, 40)
+        wrap_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         card = QFrame()
         card.setObjectName("card")
@@ -72,8 +83,8 @@ class BreakOverlay(QWidget):
         card.setMaximumWidth(760)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(32, 32, 32, 32)
-        card_layout.setSpacing(18)
+        card_layout.setContentsMargins(32, 30, 32, 30)
+        card_layout.setSpacing(16)
         card_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         title = QLabel("Time to rest your eyes")
@@ -81,13 +92,20 @@ class BreakOverlay(QWidget):
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         subtitle = QLabel(
-            "Look at something far away for 20 seconds.\n"
-            "Relax your eyes and blink naturally."
+            "Look at something far away.\n"
+            "Blink normally and relax your eyes."
         )
-
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
+
+        self.countdown_label = QLabel("20")
+        self.countdown_label.setObjectName("countdown")
+        self.countdown_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        seconds_label = QLabel("seconds left")
+        seconds_label.setObjectName("seconds_label")
+        seconds_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.back_button = QPushButton("I am back")
         self.back_button.setObjectName("primary")
@@ -95,19 +113,18 @@ class BreakOverlay(QWidget):
 
         card_layout.addWidget(title)
         card_layout.addWidget(subtitle)
+        card_layout.addSpacing(6)
+        card_layout.addWidget(self.countdown_label)
+        card_layout.addWidget(seconds_label)
         card_layout.addSpacing(8)
+        card_layout.addWidget(self.back_button, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        card_layout.addWidget(
-            self.back_button,
-            alignment=Qt.AlignmentFlag.AlignCenter
-        )
-
-        overlay_layout.addWidget(card)
-        root.addWidget(overlay)
+        wrap_layout.addWidget(card)
+        root.addWidget(self.center_wrap)
 
         self.setStyleSheet("""
-            #overlay {
-                background-color: rgba(10, 10, 14, 180);
+            #center_wrap {
+                background: transparent;
             }
 
             #card {
@@ -128,6 +145,20 @@ class BreakOverlay(QWidget):
                 line-height: 1.4em;
             }
 
+            QLabel#countdown {
+                color: #48c78e;
+                font-size: 72px;
+                font-weight: 800;
+                min-width: 180px;
+                min-height: 90px;
+            }
+
+            QLabel#seconds_label {
+                color: #c9c9d4;
+                font-size: 14px;
+                letter-spacing: 1px;
+            }
+
             QPushButton#primary {
                 background-color: #48c78e;
                 color: #0b0b0f;
@@ -142,11 +173,99 @@ class BreakOverlay(QWidget):
             QPushButton#primary:hover {
                 background-color: #5edaa0;
             }
+
+            QPushButton#primary:pressed {
+                background-color: #39b37e;
+            }
         """)
 
+    def start_break(self, duration_seconds: int = 20):
+        if self.isVisible():
+            return
+
+        self.break_duration = max(1, duration_seconds)
+        self.remaining_seconds = self.break_duration
+        self._close_after_fade = False
+
+        self._update_overlay_alpha(0.0)
+        self._update_countdown_text()
+
+        self.showFullScreen()
+        self.raise_()
+        self.activateWindow()
+
+        self.fade_animation.stop()
+        self.fade_animation.setDuration(250)
+        self.fade_animation.setStartValue(0.0)
+        self.fade_animation.setEndValue(0.88)
+        self.fade_animation.start()
+
+        self.break_timer.start(1000)
+
     def handle_back(self):
-        self.hide()
-        self.on_back_clicked()
+        self.break_timer.stop()
+        self._begin_close_animation()
+
+    def _begin_close_animation(self):
+        if not self.isVisible():
+            self.on_back_clicked()
+            return
+
+        self._close_after_fade = True
+        self.fade_animation.stop()
+        self.fade_animation.setDuration(220)
+        self.fade_animation.setStartValue(self._overlay_alpha)
+        self.fade_animation.setEndValue(0.0)
+        self.fade_animation.start()
+
+    def _tick_break(self):
+        self.remaining_seconds -= 1
+
+        if self.remaining_seconds <= 0:
+            self.break_timer.stop()
+            self._begin_close_animation()
+            return
+
+        self._update_countdown_text()
+
+        target_alpha = 0.88 * (self.remaining_seconds / self.break_duration)
+        target_alpha = max(0.0, min(0.88, target_alpha))
+
+        self.fade_animation.stop()
+        self.fade_animation.setDuration(500)
+        self.fade_animation.setStartValue(self._overlay_alpha)
+        self.fade_animation.setEndValue(target_alpha)
+        self.fade_animation.start()
+
+    def _update_countdown_text(self):
+        self.countdown_label.setText(str(max(0, self.remaining_seconds)))
+
+    def _on_fade_finished(self):
+        if self._close_after_fade:
+            self._close_after_fade = False
+            self.hide()
+            self._update_overlay_alpha(0.0)
+            self.on_back_clicked()
+
+    def _get_overlay_alpha(self) -> float:
+        return self._overlay_alpha
+
+    def _set_overlay_alpha(self, value: float):
+        self._overlay_alpha = max(0.0, min(1.0, float(value)))
+        self.update()
+
+    overlayAlpha = pyqtProperty(float, fget=_get_overlay_alpha, fset=_set_overlay_alpha)
+
+    def _update_overlay_alpha(self, value: float):
+        self._overlay_alpha = max(0.0, min(1.0, float(value)))
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        alpha = int(255 * self._overlay_alpha)
+        painter.fillRect(self.rect(), QColor(10, 10, 14, alpha))
+        super().paintEvent(event)
 
     def closeEvent(self, event):
         event.ignore()
@@ -159,10 +278,7 @@ class EyeGuard(QWidget):
 
         self.settings = QSettings("Seyfullah", "EyeGuard")
 
-        self.interval_minutes = int(
-            self.settings.value("interval_minutes", 20)
-        )
-
+        self.interval_minutes = int(self.settings.value("interval_minutes", 20))
         self.running = True
         self.remaining_seconds = self.interval_minutes * 60
 
@@ -180,7 +296,6 @@ class EyeGuard(QWidget):
         self.resize(640, 420)
 
         geometry = self.settings.value("window_geometry")
-
         if geometry:
             self.restoreGeometry(geometry)
 
@@ -275,11 +390,7 @@ class EyeGuard(QWidget):
         self.timer_label = QLabel()
         self.timer_label.setObjectName("timer")
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        self.timer_label.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Expanding,
-        )
+        self.timer_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         hint = QLabel("Next reminder countdown")
         hint.setObjectName("small")
@@ -295,10 +406,7 @@ class EyeGuard(QWidget):
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 180)
         self.interval_spin.setValue(self.interval_minutes)
-
-        self.interval_spin.valueChanged.connect(
-            self.update_interval
-        )
+        self.interval_spin.valueChanged.connect(self.update_interval)
 
         minutes_text = QLabel("minutes")
 
@@ -339,11 +447,7 @@ class EyeGuard(QWidget):
         self.timer.start(1000)
 
     def setup_tray(self):
-        self.tray = QSystemTrayIcon(
-            QIcon(ICON_PATH),
-            self
-        )
-
+        self.tray = QSystemTrayIcon(QIcon(ICON_PATH), self)
         self.tray.setToolTip("Eye Guard")
 
         menu = QMenu()
@@ -360,7 +464,6 @@ class EyeGuard(QWidget):
 
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self.tray_clicked)
-
         self.tray.show()
 
     def tick(self):
@@ -372,25 +475,18 @@ class EyeGuard(QWidget):
         if self.remaining_seconds <= 0:
             self.show_break_overlay()
             self.reset_timer()
+            return
 
         self.update_timer_display()
 
     def update_timer_display(self):
         minutes = max(0, self.remaining_seconds) // 60
         seconds = max(0, self.remaining_seconds) % 60
-
-        self.timer_label.setText(
-            f"{minutes:02}:{seconds:02}"
-        )
+        self.timer_label.setText(f"{minutes:02}:{seconds:02}")
 
     def update_interval(self):
         self.interval_minutes = self.interval_spin.value()
-
-        self.settings.setValue(
-            "interval_minutes",
-            self.interval_minutes
-        )
-
+        self.settings.setValue("interval_minutes", self.interval_minutes)
         self.reset_timer()
 
     def reset_timer(self):
@@ -399,40 +495,26 @@ class EyeGuard(QWidget):
 
     def toggle_pause(self):
         self.running = not self.running
-
-        if self.running:
-            self.pause_button.setText("Pause")
-        else:
-            self.pause_button.setText("Resume")
+        self.pause_button.setText("Pause" if self.running else "Resume")
 
     def show_break_overlay(self):
         if self.overlay.isVisible():
             return
-
-        self.overlay.showFullScreen()
-        self.overlay.raise_()
-        self.overlay.activateWindow()
+        self.overlay.start_break(20)
 
     def on_break_finished(self):
         self.reset_timer()
         self.show_window()
 
     def closeEvent(self, event):
-
-        self.settings.setValue(
-            "window_geometry",
-            self.saveGeometry()
-        )
-
+        self.settings.setValue("window_geometry", self.saveGeometry())
         event.ignore()
-
         self.hide()
-
         self.tray.showMessage(
             "Eye Guard",
             "Application minimized to tray.",
             QSystemTrayIcon.MessageIcon.Information,
-            2500
+            2500,
         )
 
     def tray_clicked(self, reason):
@@ -447,9 +529,7 @@ class EyeGuard(QWidget):
 
 def main():
     app = QApplication(sys.argv)
-
     app.setQuitOnLastWindowClosed(False)
-
     app.setWindowIcon(QIcon(ICON_PATH))
 
     window = EyeGuard()
