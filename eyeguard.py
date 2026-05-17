@@ -1,8 +1,8 @@
-# eye_guard.py
+# eyeguard.py
 
 import sys
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QAction, QFont
+from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QWidget,
@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QSpinBox,
     QSystemTrayIcon,
     QMenu,
-    QMessageBox,
     QFrame,
     QSizePolicy,
 )
@@ -27,11 +26,14 @@ class BreakOverlay(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Eye Guard Break")
+        self.setWindowIcon(QIcon("icon.png"))
+
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
+
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         root = QVBoxLayout(self)
@@ -39,6 +41,7 @@ class BreakOverlay(QWidget):
 
         overlay = QFrame()
         overlay.setObjectName("overlay")
+
         overlay_layout = QVBoxLayout(overlay)
         overlay_layout.setContentsMargins(40, 40, 40, 40)
         overlay_layout.setSpacing(20)
@@ -60,21 +63,24 @@ class BreakOverlay(QWidget):
 
         subtitle = QLabel(
             "Look at something far away for 20 seconds.\n"
-            "Relax your eyes, blink a few times, then come back."
+            "Relax your eyes and blink naturally."
         )
+
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setWordWrap(True)
 
         self.back_button = QPushButton("I am back")
         self.back_button.setObjectName("primary")
-        self.back_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.back_button.clicked.connect(self.handle_back)
 
         card_layout.addWidget(title)
         card_layout.addWidget(subtitle)
         card_layout.addSpacing(8)
-        card_layout.addWidget(self.back_button, alignment=Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(
+            self.back_button,
+            alignment=Qt.AlignmentFlag.AlignCenter
+        )
 
         overlay_layout.addWidget(card)
         root.addWidget(overlay)
@@ -94,7 +100,6 @@ class BreakOverlay(QWidget):
                 color: white;
                 font-size: 30px;
                 font-weight: 700;
-                letter-spacing: 0.2px;
             }
 
             QLabel#subtitle {
@@ -117,27 +122,13 @@ class BreakOverlay(QWidget):
             QPushButton#primary:hover {
                 background-color: #5edaa0;
             }
-
-            QPushButton#primary:pressed {
-                background-color: #39b37e;
-            }
         """)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.raise_()
-        self.activateWindow()
 
     def handle_back(self):
         self.hide()
         self.on_back_clicked()
 
-    def keyPressEvent(self, event):
-        # Prevent accidental dismissal by keyboard shortcuts.
-        event.ignore()
-
     def closeEvent(self, event):
-        # Hide instead of destroying.
         event.ignore()
         self.hide()
 
@@ -147,7 +138,6 @@ class EyeGuard(QWidget):
         super().__init__()
 
         self.interval_minutes = 20
-        self.break_seconds = 20
         self.running = True
         self.remaining_seconds = self.interval_minutes * 60
 
@@ -159,6 +149,8 @@ class EyeGuard(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Eye Guard")
+        self.setWindowIcon(QIcon("icon.png"))
+
         self.setMinimumSize(560, 360)
         self.resize(640, 420)
 
@@ -245,6 +237,7 @@ class EyeGuard(QWidget):
 
         card = QFrame()
         card.setObjectName("card")
+
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(24, 24, 24, 24)
         card_layout.setSpacing(16)
@@ -252,6 +245,7 @@ class EyeGuard(QWidget):
         self.timer_label = QLabel()
         self.timer_label.setObjectName("timer")
         self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         self.timer_label.setSizePolicy(
             QSizePolicy.Policy.Expanding,
             QSizePolicy.Policy.Expanding,
@@ -265,13 +259,14 @@ class EyeGuard(QWidget):
         card_layout.addWidget(hint)
 
         settings_row = QHBoxLayout()
-        settings_row.setSpacing(10)
 
         interval_text = QLabel("Reminder every")
+
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 180)
         self.interval_spin.setValue(20)
         self.interval_spin.valueChanged.connect(self.update_interval)
+
         minutes_text = QLabel("minutes")
 
         settings_row.addWidget(interval_text)
@@ -280,7 +275,6 @@ class EyeGuard(QWidget):
         settings_row.addStretch()
 
         buttons_row = QHBoxLayout()
-        buttons_row.setSpacing(10)
 
         self.pause_button = QPushButton("Pause")
         self.pause_button.clicked.connect(self.toggle_pause)
@@ -312,10 +306,11 @@ class EyeGuard(QWidget):
         self.timer.start(1000)
 
     def setup_tray(self):
-        self.tray = QSystemTrayIcon(self)
+        self.tray = QSystemTrayIcon(QIcon("icon.png"), self)
         self.tray.setToolTip("Eye Guard")
 
         menu = QMenu()
+
         show_action = QAction("Show", self)
         quit_action = QAction("Quit", self)
 
@@ -328,6 +323,7 @@ class EyeGuard(QWidget):
 
         self.tray.setContextMenu(menu)
         self.tray.activated.connect(self.tray_clicked)
+
         self.tray.show()
 
     def tick(self):
@@ -345,6 +341,7 @@ class EyeGuard(QWidget):
     def update_timer_display(self):
         minutes = max(0, self.remaining_seconds) // 60
         seconds = max(0, self.remaining_seconds) % 60
+
         self.timer_label.setText(f"{minutes:02}:{seconds:02}")
 
     def update_interval(self):
@@ -357,7 +354,11 @@ class EyeGuard(QWidget):
 
     def toggle_pause(self):
         self.running = not self.running
-        self.pause_button.setText("Pause" if self.running else "Resume")
+
+        if self.running:
+            self.pause_button.setText("Pause")
+        else:
+            self.pause_button.setText("Resume")
 
     def show_break_overlay(self):
         if self.overlay.isVisible():
@@ -374,6 +375,7 @@ class EyeGuard(QWidget):
     def closeEvent(self, event):
         event.ignore()
         self.hide()
+
         self.tray.showMessage(
             "Eye Guard",
             "Application minimized to tray.",
@@ -393,7 +395,10 @@ class EyeGuard(QWidget):
 
 def main():
     app = QApplication(sys.argv)
+
     app.setQuitOnLastWindowClosed(False)
+
+    app.setWindowIcon(QIcon("icon.png"))
 
     window = EyeGuard()
     window.show()
