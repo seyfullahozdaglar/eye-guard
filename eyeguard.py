@@ -1,7 +1,7 @@
 # eyeguard.py
 
 import sys
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSettings
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -21,7 +21,9 @@ from PyQt6.QtWidgets import (
 class BreakOverlay(QWidget):
     def __init__(self, on_back_clicked):
         super().__init__()
+
         self.on_back_clicked = on_back_clicked
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -34,7 +36,10 @@ class BreakOverlay(QWidget):
             | Qt.WindowType.Tool
         )
 
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(
+            Qt.WidgetAttribute.WA_TranslucentBackground,
+            True
+        )
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -77,6 +82,7 @@ class BreakOverlay(QWidget):
         card_layout.addWidget(title)
         card_layout.addWidget(subtitle)
         card_layout.addSpacing(8)
+
         card_layout.addWidget(
             self.back_button,
             alignment=Qt.AlignmentFlag.AlignCenter
@@ -137,7 +143,12 @@ class EyeGuard(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.interval_minutes = 20
+        self.settings = QSettings("Seyfullah", "EyeGuard")
+
+        self.interval_minutes = int(
+            self.settings.value("interval_minutes", 20)
+        )
+
         self.running = True
         self.remaining_seconds = self.interval_minutes * 60
 
@@ -153,6 +164,11 @@ class EyeGuard(QWidget):
 
         self.setMinimumSize(560, 360)
         self.resize(640, 420)
+
+        geometry = self.settings.value("window_geometry")
+
+        if geometry:
+            self.restoreGeometry(geometry)
 
         self.setStyleSheet("""
             QWidget {
@@ -264,8 +280,11 @@ class EyeGuard(QWidget):
 
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(1, 180)
-        self.interval_spin.setValue(20)
-        self.interval_spin.valueChanged.connect(self.update_interval)
+        self.interval_spin.setValue(self.interval_minutes)
+
+        self.interval_spin.valueChanged.connect(
+            self.update_interval
+        )
 
         minutes_text = QLabel("minutes")
 
@@ -306,7 +325,11 @@ class EyeGuard(QWidget):
         self.timer.start(1000)
 
     def setup_tray(self):
-        self.tray = QSystemTrayIcon(QIcon("icon.png"), self)
+        self.tray = QSystemTrayIcon(
+            QIcon("icon.png"),
+            self
+        )
+
         self.tray.setToolTip("Eye Guard")
 
         menu = QMenu()
@@ -342,10 +365,18 @@ class EyeGuard(QWidget):
         minutes = max(0, self.remaining_seconds) // 60
         seconds = max(0, self.remaining_seconds) % 60
 
-        self.timer_label.setText(f"{minutes:02}:{seconds:02}")
+        self.timer_label.setText(
+            f"{minutes:02}:{seconds:02}"
+        )
 
     def update_interval(self):
         self.interval_minutes = self.interval_spin.value()
+
+        self.settings.setValue(
+            "interval_minutes",
+            self.interval_minutes
+        )
+
         self.reset_timer()
 
     def reset_timer(self):
@@ -373,7 +404,14 @@ class EyeGuard(QWidget):
         self.show_window()
 
     def closeEvent(self, event):
+
+        self.settings.setValue(
+            "window_geometry",
+            self.saveGeometry()
+        )
+
         event.ignore()
+
         self.hide()
 
         self.tray.showMessage(
